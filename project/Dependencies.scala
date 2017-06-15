@@ -18,4 +18,10 @@ object Dependencies {
     )
   }
 
+  val scopt = {
+    Seq(
+      "com.github.scopt" %% "scopt" % "3.6.0"
+    )
+  }
+
 }
