@@ -1,13 +1,11 @@
-name := "akka-quickstart-scala"
+/*
+ * Aggregates and builds top level components
+ */
+lazy val root = Project("focused-crawler", file(".")).
+  aggregate(
+    engine
+  )
 
-version := "1.0"
-
-scalaVersion := "2.12.2"
-
-lazy val akkaVersion = "2.5.2"
-
-libraryDependencies ++= Seq(
-  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-  "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
-  "org.scalatest" %% "scalatest" % "3.0.1" % "test"
-)
+lazy val engine = project.in(file("engine")).
+  settings(Common.settings: _*).
+  settings(libraryDependencies ++= Dependencies.akka)
