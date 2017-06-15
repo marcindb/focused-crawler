@@ -8,4 +8,6 @@ lazy val root = Project("focused-crawler", file(".")).
 
 lazy val engine = project.in(file("engine")).
   settings(Common.settings: _*).
-  settings(libraryDependencies ++= Dependencies.akka)
+  settings(
+    libraryDependencies ++= Dependencies.akka ++ Dependencies.scrapper
+  )
