@@ -1,25 +1,44 @@
 package pl.ekodo.crawler.focused.engine.scrapper
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import java.net.URL
+
+import akka.actor.{Actor, ActorLogging, Props}
 import pl.ekodo.crawler.focused.engine.scrapper.LinkScrapper._
 
 object LinkScrapper {
 
-  case class GetLinks(url: String)
+  case class GetLinks(url: URL, seed: URL, depth: Int)
 
-  case class ScrappedLinks(src: String, links: Set[Link])
+  case class GetLinksOK(gl: GetLinks, links: Set[Link])
 
-  def props(indexer: ActorRef, scrapper: Scrapper = JsoupScrapper) =
-    Props(new LinkScrapper(indexer, scrapper))
+  case class GetLinksError(message: GetLinks, reason: Throwable)
+
+  def props(scrapper: Scrapper = JsoupScrapper) = Props(new LinkScrapper(scrapper))
 
 }
 
-class LinkScrapper(indexer: ActorRef, scrapper: Scrapper) extends Actor with ActorLogging {
+class LinkScrapper(scrapper: Scrapper) extends Actor with ActorLogging {
+
+  override def preStart(): Unit = {
+    log.debug("Link scrapper started: {}", context.self.path.toString)
+  }
+
+  override def postStop(): Unit = {
+    log.debug("Link scrapper stopped: {}", context.self.path.toString)
+  }
 
   override def receive: Receive = {
-    case GetLinks(url) =>
-      val links = scrapper.links(url)
-      indexer ! ScrappedLinks(url, links)
+    case gl@GetLinks(url, seed, depth) =>
+      val tryLinks = scrapper.links(url)
+      tryLinks.fold(
+        ex => {
+          log.warning("Exception occurred during scrapping {}, reason {}", gl, ex.getMessage)
+          sender ! GetLinksError(gl, ex)
+        },
+        links => {
+          sender ! GetLinksOK(gl, links)
+        }
+      )
   }
 
 }

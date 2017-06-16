@@ -1,5 +1,7 @@
 package pl.ekodo.crawler.focused.engine.scrapper
 
+import java.net.URL
+
 import net.ruippeixotog.scalascraper.browser.JsoupBrowser
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -11,8 +13,8 @@ class JsoupScrapperSpec extends FlatSpec with Matchers {
     val links = JsoupScrapper.links(doc)
 
     links should contain only (
-      Link("http://example.com", "<a href=\"http://example.com\">Example</a>"),
-      Link("http://example.com/one", "<a href=\"http://example.com/one\">One</a>")
+      Link(new URL("http://example.com"), "<a href=\"http://example.com\">Example</a>"),
+      Link(new URL("http://example.com/one"), "<a href=\"http://example.com/one\">One</a>")
       )
   }
 

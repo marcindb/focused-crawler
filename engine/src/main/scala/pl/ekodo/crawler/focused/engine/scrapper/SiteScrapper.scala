@@ -1,72 +1,88 @@
 package pl.ekodo.crawler.focused.engine.scrapper
 
-import akka.actor.{Actor, Props}
+import java.net.URL
+
+import akka.actor.{Actor, ActorLogging, ActorRef, Props, ReceiveTimeout, Stash}
+import pl.ekodo.crawler.focused.engine.frontier.Indexer
 import pl.ekodo.crawler.focused.engine.scrapper.SiteScrapper._
 
-import scala.collection.immutable.Queue
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 case class SiteScrapperConfig(
   domain: String,
-  seedUrl: String,
-  scrappingDelay: FiniteDuration,
   maxLinksVisited: Int
 )
 
 object SiteScrapper {
 
-  case class Process(url: String)
+  case class Process(url: URL, seed: URL, depth: Int)
 
-  sealed trait DoneReason
+  sealed trait Done
 
-  case object EmptyQueue extends DoneReason
+  case object MaxRequestsExceeded extends Done
 
-  case object MaxLinksExceeded extends DoneReason
+  case object NoMoreWork extends Done
 
-  case class Done(reason: DoneReason)
-
-  private case object ProcessNext
-
-  def props(config: SiteScrapperConfig, linkScrapperProps: Props) =
-    Props(new SiteScrapper(config, linkScrapperProps))
+  def props(config: SiteScrapperConfig, indexer: ActorRef, scrapper: ActorRef) =
+    Props(new SiteScrapper(config, indexer, scrapper))
 
 }
 
-class SiteScrapper(config: SiteScrapperConfig, linkScrapperProps: Props)
-  extends Actor {
+class SiteScrapper(config: SiteScrapperConfig, indexer: ActorRef, scrapper: ActorRef)
+  extends Actor with Stash with ActorLogging {
 
-  private val linkScrapper = context.actorOf(linkScrapperProps)
+  private implicit val ec: ExecutionContext = context.system.dispatcher
 
-  private var linksCounter = 0
-
-  private implicit val ec: ExecutionContext = context.dispatcher
-
-  private val tick =
-    context.system.scheduler.schedule(0.millis, config.scrappingDelay, self, ProcessNext)
+  private var requestsCounter = 0
 
   override def preStart(): Unit = {
-    self ! Process(config.seedUrl)
+    context.setReceiveTimeout(5.minutes)
+    log.debug("Site scrapper started for domain: {}", config.domain)
   }
 
-  override def receive: Receive = process(Queue.empty)
+  override def postStop(): Unit = {
+    log.debug("Site scrapper stopped for domain: {}", config.domain)
+  }
 
-  override def postStop() = tick.cancel()
+  override def receive: Receive = idle
 
-  private def process(urls: Queue[String]): Receive = {
-    case Process(url) =>
-      if (linksCounter < config.maxLinksVisited) {
-        linksCounter = linksCounter + 1
-        context.become(process(urls :+ url))
+  private def idle: Receive = {
+
+    case Process(url, seed, depth) =>
+      if (requestsCounter < config.maxLinksVisited) {
+        requestsCounter = requestsCounter + 1
+        scrapper ! LinkScrapper.GetLinks(url, seed, depth)
+        context.become(busy)
       } else {
-        sender ! Done(MaxLinksExceeded)
+        sender ! MaxRequestsExceeded
       }
 
-    case ProcessNext =>
-      urls.dequeueOption.foreach { case (url, q) =>
-        linkScrapper ! LinkScrapper.GetLinks(url)
-        context.become(process(q))
-      }
+    case ReceiveTimeout =>
+      context.parent ! NoMoreWork
+
+  }
+
+  private def busy: Receive = {
+
+    case p: Process =>
+      stash()
+
+    case LinkScrapper.GetLinksOK(gl, links) =>
+      unstashAll()
+      context.unbecome()
+      indexer ! Indexer.Index(gl.url, gl.seed, gl.depth, links)
+
+    case error: LinkScrapper.GetLinksError =>
+      unstashAll()
+      context.unbecome()
+
+    case ReceiveTimeout =>
+      log.warning("Got receive timeout waiting for scrapper response: {}", config.domain)
+      unstashAll()
+      context.setReceiveTimeout(5.minutes)
+      context.unbecome()
+
   }
 
 }
