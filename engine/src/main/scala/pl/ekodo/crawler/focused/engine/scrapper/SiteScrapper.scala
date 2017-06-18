@@ -22,6 +22,8 @@ object SiteScrapper {
 
   case object MaxRequestsExceeded extends Done
 
+  case object MaxErrorsExceeded extends Done
+
   case object NoMoreWork extends Done
 
   def props(config: SiteScrapperConfig, indexer: ActorRef, scrapper: ActorRef) =
@@ -34,7 +36,11 @@ class SiteScrapper(config: SiteScrapperConfig, indexer: ActorRef, scrapper: Acto
 
   private implicit val ec: ExecutionContext = context.system.dispatcher
 
+  private val MaxNumberOfErrors = 20
+
   private var requestsCounter = 0
+
+  private var errorsCounter = 0
 
   override def preStart(): Unit = {
     context.setReceiveTimeout(5.minutes)
@@ -74,8 +80,13 @@ class SiteScrapper(config: SiteScrapperConfig, indexer: ActorRef, scrapper: Acto
       indexer ! Indexer.Index(gl.url, gl.seed, gl.depth, links)
 
     case error: LinkScrapper.GetLinksError =>
-      unstashAll()
-      context.unbecome()
+      errorsCounter = errorsCounter + 1
+      if(errorsCounter > MaxNumberOfErrors) {
+        context.parent ! MaxErrorsExceeded
+      } else {
+        unstashAll()
+        context.unbecome()
+      }
 
     case ReceiveTimeout =>
       log.warning("Got receive timeout waiting for scrapper response: {}", config.domain)

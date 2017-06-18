@@ -102,7 +102,7 @@ class SchedulerSpec extends AkkaTest(ActorSystem("scheduler-spec")) {
 
   }
 
-  it should "handle NoMoreWork message from site scrapper" in {
+  it should "handle NoMoreWork message from site scrapper and do not process messages from this domain" in {
     val testProbe = TestProbe()
     val indexer = TestProbe()
 
@@ -126,6 +126,37 @@ class SchedulerSpec extends AkkaTest(ActorSystem("scheduler-spec")) {
 
     scheduler.children.filterNot(_.path.name == "scrappers").foreach { siteScrapper =>
       scheduler.tell(SiteScrapper.NoMoreWork, siteScrapper)
+    }
+
+    scheduler.tell(Scheduler.Schedule(seed, 1, urls), testProbe.ref)
+
+    indexer.expectNoMsg()
+  }
+
+  it should "handle MaxErrorsExceeded message from site scrapper and do not process messages from this domain" in {
+    val testProbe = TestProbe()
+    val indexer = TestProbe()
+
+    val scrapperProps = Props(new Actor {
+      override def receive: Receive = {
+        case gl: GetLinks =>
+          sender ! GetLinksOK(gl, Set.empty)
+      }
+    })
+    val scheduler = TestActorRef(Scheduler.props(scrapperProps))
+    val seed = new URL("http://google.com")
+    val urls = Set(new URL("http://google.com/policies"), new URL("http://google.com/about"))
+
+    scheduler.tell(Scheduler.Register(indexer.ref), testProbe.ref)
+    scheduler.tell(Scheduler.Schedule(seed, 0, urls), testProbe.ref)
+
+    indexer.expectMsgAllOf(
+      Indexer.Index(new URL("http://google.com/policies"), seed, 0, Set.empty),
+      Indexer.Index(new URL("http://google.com/about"), seed, 0, Set.empty)
+    )
+
+    scheduler.children.filterNot(_.path.name == "scrappers").foreach { siteScrapper =>
+      scheduler.tell(SiteScrapper.MaxErrorsExceeded, siteScrapper)
     }
 
     scheduler.tell(Scheduler.Schedule(seed, 1, urls), testProbe.ref)

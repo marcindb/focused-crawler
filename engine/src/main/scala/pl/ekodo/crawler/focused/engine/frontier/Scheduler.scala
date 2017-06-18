@@ -35,6 +35,8 @@ object Scheduler {
 
   private type ClosedScrappers = Map[Domain, CloseReason]
 
+  private val MaxRequestsPerDomain = 1000
+
 }
 
 class Scheduler(linkScrapperProps: Props) extends Actor with ActorLogging {
@@ -76,6 +78,9 @@ class Scheduler(linkScrapperProps: Props) extends Actor with ActorLogging {
     case SiteScrapper.NoMoreWork =>
       closeScrapper(sender, Inactive)
 
+    case SiteScrapper.MaxErrorsExceeded =>
+      closeScrapper(sender, MaxErrors)
+
     case SetMetrics =>
       activeSizeMetric.record(active.size)
       closedSizeMetric.record(closed.size)
@@ -90,7 +95,9 @@ class Scheduler(linkScrapperProps: Props) extends Actor with ActorLogging {
     val domains = links.map(_.getHost)
     val toCreate = domains.filterNot(active.contains).filterNot(closed.contains)
     val newScrappers = toCreate.map { domain =>
-      (domain, context.actorOf(SiteScrapper.props(SiteScrapperConfig(domain, 1000), indexer, scrappers), s"scrapper-$domain"))
+      (domain, context.actorOf(
+        SiteScrapper.props(SiteScrapperConfig(domain, MaxRequestsPerDomain), indexer, scrappers),
+        s"scrapper-$domain"))
     }
     active ++ newScrappers
   }
