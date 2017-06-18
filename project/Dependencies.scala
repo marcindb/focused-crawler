@@ -12,4 +12,16 @@ object Dependencies {
     )
   }
 
+  val scrapper = {
+    Seq(
+      "net.ruippeixotog" %% "scala-scraper" % "2.0.0-RC2"
+    )
+  }
+
+  val scopt = {
+    Seq(
+      "com.github.scopt" %% "scopt" % "3.6.0"
+    )
+  }
+
 }
