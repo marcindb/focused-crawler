@@ -3,6 +3,7 @@ package pl.ekodo.crawler.focused.engine.frontier
 import java.net.URL
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import kamon.Kamon
 import pl.ekodo.crawler.focused.engine.frontier.Indexer.Index
 import pl.ekodo.crawler.focused.engine.scrapper.Link
 
@@ -16,6 +17,8 @@ object Indexer {
 
 class Indexer(depth: Int, seeds: Set[URL], scheduler: ActorRef) extends Actor with ActorLogging {
 
+  private val indexSizeMetric = Kamon.metrics.counter("index-size")
+
   private var indexed = seeds
 
   private val seedIndexers = seeds.map { seed =>
@@ -27,6 +30,7 @@ class Indexer(depth: Int, seeds: Set[URL], scheduler: ActorRef) extends Actor wi
     seeds.foreach { seed =>
       scheduler ! Scheduler.Schedule(seed, 0, Set(seed))
     }
+    indexSizeMetric.increment(seeds.size)
   }
 
   override def receive: Receive = {
@@ -36,6 +40,7 @@ class Indexer(depth: Int, seeds: Set[URL], scheduler: ActorRef) extends Actor wi
         seedIndexers(seed) ! SeedIndexer.IndexConnections(tv.map(url => SeedIndexer.Connection(src, url)))
         scheduler ! Scheduler.Schedule(seed, depth + 1, toVisit(i).map(_.url))
         indexed = indexed ++ tv
+        indexSizeMetric.increment(tv.size)
       }
   }
 

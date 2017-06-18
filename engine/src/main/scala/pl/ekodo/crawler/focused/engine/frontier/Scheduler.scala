@@ -3,8 +3,12 @@ package pl.ekodo.crawler.focused.engine.frontier
 import java.net.URL
 
 import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props, Terminated}
+import kamon.Kamon
 import pl.ekodo.crawler.focused.engine.frontier.Scheduler._
 import pl.ekodo.crawler.focused.engine.scrapper.{SiteScrapper, SiteScrapperConfig}
+
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 
 object Scheduler {
@@ -13,9 +17,7 @@ object Scheduler {
 
   case class Register(indexer: ActorRef)
 
-  case object GetStatus
-
-  case class Status(activeDomains: Int, closedDomains: Int)
+  private case object SetMetrics
 
   def props(linkScrapperProps: Props) = Props(new Scheduler(linkScrapperProps))
 
@@ -37,11 +39,23 @@ object Scheduler {
 
 class Scheduler(linkScrapperProps: Props) extends Actor with ActorLogging {
 
+  private implicit val ec: ExecutionContext = context.dispatcher
+
+  private val activeSizeMetric = Kamon.metrics.gauge("active-domains-size")(0L)
+
+  private val closedSizeMetric = Kamon.metrics.gauge("closed-domains-size")(0L)
+
+  private val metricsTick = context.system.scheduler.schedule(1.second, 1.second, self, SetMetrics)
+
   private var active: ActiveScrappers = Map.empty
 
   private var closed: ClosedScrappers = Map.empty
 
   private val scrappers = context.actorOf(linkScrapperProps, "scrappers")
+
+  override def postStop(): Unit = {
+    metricsTick.cancel()
+  }
 
   override def receive: Receive = {
 
@@ -57,21 +71,14 @@ class Scheduler(linkScrapperProps: Props) extends Actor with ActorLogging {
       urls.foreach(url => process(url, seed, depth, active))
 
     case SiteScrapper.MaxRequestsExceeded =>
-      active.find { case (_, v) => v == sender }.foreach { case (domain, _) =>
-        active = active - domain
-        closed = closed + (domain -> MaxLinks)
-      }
-      sender ! PoisonPill
+      closeScrapper(sender, MaxLinks)
 
     case SiteScrapper.NoMoreWork =>
-      active.find { case (_, v) => v == sender }.foreach { case (domain, _) =>
-        active = active - domain
-        closed = closed + (domain -> Inactive)
-      }
-      sender ! PoisonPill
+      closeScrapper(sender, Inactive)
 
-    case GetStatus =>
-      sender ! Status(active.size, closed.size)
+    case SetMetrics =>
+      activeSizeMetric.record(active.size)
+      closedSizeMetric.record(closed.size)
 
     case Terminated(`indexer`) =>
       log.info("Indexer unregistered")
@@ -86,6 +93,14 @@ class Scheduler(linkScrapperProps: Props) extends Actor with ActorLogging {
       (domain, context.actorOf(SiteScrapper.props(SiteScrapperConfig(domain, 1000), indexer, scrappers), s"scrapper-$domain"))
     }
     active ++ newScrappers
+  }
+
+  private def closeScrapper(scrapper: ActorRef, reason: CloseReason) = {
+    active.find { case (_, v) => v == scrapper }.foreach { case (domain, _) =>
+      active = active - domain
+      closed = closed + (domain -> reason)
+    }
+    scrapper ! PoisonPill
   }
 
   private def process(url: URL, seed: URL, depth: Int, scrappers: ActiveScrappers) =
