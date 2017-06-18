@@ -83,7 +83,7 @@ class Scheduler(linkScrapperProps: Props) extends Actor with ActorLogging {
     val domains = links.map(_.getHost)
     val toCreate = domains.filterNot(active.contains).filterNot(closed.contains)
     val newScrappers = toCreate.map { domain =>
-      (domain, context.actorOf(SiteScrapper.props(SiteScrapperConfig(domain, 1000), indexer, scrappers)))
+      (domain, context.actorOf(SiteScrapper.props(SiteScrapperConfig(domain, 1000), indexer, scrappers), s"scrapper-$domain"))
     }
     active ++ newScrappers
   }

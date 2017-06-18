@@ -5,6 +5,7 @@ import java.net.URI
 import akka.actor.ActorSystem
 import akka.pattern.ask
 import akka.util.Timeout
+import kamon.Kamon
 import pl.ekodo.crawler.focused.engine.Supervisor.GetResults
 
 import scala.concurrent.ExecutionContext
@@ -15,6 +16,7 @@ object Engine extends App {
 
   ConfigParser.parser.parse(args, RuntimeConfig()) match {
     case Some(config) =>
+      Kamon.start()
       val system: ActorSystem = ActorSystem("focused-crawler")
       val root = system.actorOf(Supervisor.props(config), "supervisor")
 
@@ -26,8 +28,10 @@ object Engine extends App {
         case Success(r) =>
           system.log.info(s"$r")
           system.terminate()
+          Kamon.shutdown()
         case Failure(ex) =>
           system.terminate()
+          Kamon.shutdown()
       }
     case None =>
       sys.exit(-1)

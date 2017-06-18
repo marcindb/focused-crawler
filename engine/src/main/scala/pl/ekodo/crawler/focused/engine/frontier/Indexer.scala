@@ -37,7 +37,6 @@ class Indexer(depth: Int, seeds: Set[URL], scheduler: ActorRef) extends Actor wi
         scheduler ! Scheduler.Schedule(seed, depth + 1, toVisit(i).map(_.url))
         indexed = indexed ++ tv
       }
-      log.info(s"${indexed.size}")
   }
 
   private def toVisit(index: Index): Set[Link] =
