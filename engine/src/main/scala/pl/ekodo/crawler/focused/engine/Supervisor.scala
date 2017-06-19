@@ -3,7 +3,7 @@ package pl.ekodo.crawler.focused.engine
 import java.net.MalformedURLException
 
 import akka.actor.SupervisorStrategy.{Escalate, Resume}
-import akka.actor.{Actor, ActorLogging, OneForOneStrategy, Props}
+import akka.actor.{Actor, ActorLogging, OneForOneStrategy, PoisonPill, Props}
 import akka.routing.FromConfig
 import pl.ekodo.crawler.focused.engine.Supervisor._
 import pl.ekodo.crawler.focused.engine.frontier._
@@ -85,7 +85,7 @@ private class Supervisor(config: RuntimeConfig) extends Actor with ActorLogging 
 
   private implicit val ec: ExecutionContext = context.system.dispatcher
 
-  private val tick = context.system.scheduler.schedule(1.second, 1.second, self, CheckStatus)
+  private val tick = context.system.scheduler.schedule(3.second, 3.second, self, CheckStatus)
 
   override def receive: Receive = monitor
 
@@ -96,6 +96,7 @@ private class Supervisor(config: RuntimeConfig) extends Actor with ActorLogging 
       indexer ! Indexer.GetStatus
 
     case Scheduler.Status(active, closed) =>
+      log.info("Scheduler status [active = {}, closed = {}]", active, closed)
       if (active == 0) {
         log.info("All domains closed, ready to shutdown")
         indexer ! Indexer.Finish
@@ -103,8 +104,10 @@ private class Supervisor(config: RuntimeConfig) extends Actor with ActorLogging 
       }
 
     case Indexer.Status(indexed) =>
+      log.info("Indexer status [size = {}]", indexed)
       if (indexed > config.maxLinksNumber) {
         log.info("Max number of links exceeded, ready to shutdown")
+        scheduler ! PoisonPill
         indexer ! Indexer.Finish
         context.become(finishing)
       }
