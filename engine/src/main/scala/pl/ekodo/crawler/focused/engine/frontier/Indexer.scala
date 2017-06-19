@@ -1,9 +1,9 @@
 package pl.ekodo.crawler.focused.engine.frontier
 
 import java.net.{MalformedURLException, URL}
-import java.nio.file.Path
+import java.nio.file.{NoSuchFileException, Path}
 
-import akka.actor.SupervisorStrategy.{Escalate, Resume}
+import akka.actor.SupervisorStrategy.{Escalate, Resume, Stop}
 import akka.actor.{Actor, ActorLogging, ActorRef, OneForOneStrategy, Props, Terminated}
 import kamon.Kamon
 import pl.ekodo.crawler.focused.engine.frontier.Indexer._
@@ -82,7 +82,7 @@ class Indexer(outputDir: String, maxDepth: Int, seeds: Set[URL], scheduler: Acto
 
   override val supervisorStrategy =
     OneForOneStrategy() {
-      case _: MalformedURLException => Resume
+      case _: NoSuchFileException => Stop
       case _: Exception => Escalate
     }
 
