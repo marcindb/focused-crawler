@@ -4,10 +4,14 @@ import java.net.URL
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import kamon.Kamon
-import pl.ekodo.crawler.focused.engine.frontier.Indexer.Index
+import pl.ekodo.crawler.focused.engine.frontier.Indexer.{GetStatus, Index, Status}
 import pl.ekodo.crawler.focused.engine.scrapper.Link
 
 object Indexer {
+
+  case object GetStatus
+
+  case class Status(indexed: Int)
 
   case class Index(src: URL, seed: URL, depth: Int, links: Set[Link])
 
@@ -42,6 +46,9 @@ class Indexer(depth: Int, seeds: Set[URL], scheduler: ActorRef) extends Actor wi
         indexed = indexed ++ tv
         indexSizeMetric.increment(tv.size)
       }
+
+    case GetStatus =>
+      sender ! Status(indexed.size)
   }
 
   private def toVisit(index: Index): Set[Link] =
