@@ -6,7 +6,6 @@ import akka.actor.ActorSystem
 import akka.pattern.ask
 import akka.util.Timeout
 import kamon.Kamon
-import pl.ekodo.crawler.focused.engine.Supervisor.GetResults
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -18,20 +17,23 @@ object Engine extends App {
     case Some(config) =>
       Kamon.start()
       val system: ActorSystem = ActorSystem("focused-crawler")
-      val root = system.actorOf(Supervisor.props(config), "supervisor")
+      val supervisor = system.actorOf(Supervisor.props(config), "supervisor")
 
-      implicit val timeout = Timeout(60.seconds)
+      implicit val timeout = Timeout(5.seconds)
       implicit val ec: ExecutionContext = system.dispatcher
 
-      val response = (root ? GetResults)
-      response.onComplete {
-        case Success(r) =>
-          system.log.info(s"$r")
-          system.terminate()
-          Kamon.shutdown()
-        case Failure(ex) =>
-          system.terminate()
-          Kamon.shutdown()
+      system.scheduler.schedule(5.seconds, 5.seconds) {
+        val response = (supervisor ? Supervisor.GetAppStatus).mapTo[Supervisor.AppStatus]
+        response.onComplete {
+          case Success(r) if r == Supervisor.Finished =>
+            system.log.info("Finished job")
+            system.terminate()
+            Kamon.shutdown()
+          case Success(r) if r == Supervisor.Working =>
+            system.log.debug("Crawler still working")
+          case Failure(ex) =>
+            system.log.error("Could not get app status")
+        }
       }
     case None =>
       sys.exit(-1)

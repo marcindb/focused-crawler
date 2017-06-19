@@ -43,7 +43,7 @@ class SiteScrapper(config: SiteScrapperConfig, indexer: ActorRef, scrapper: Acto
   private var errorsCounter = 0
 
   override def preStart(): Unit = {
-    context.setReceiveTimeout(5.minutes)
+    context.setReceiveTimeout(1.minute)
     log.debug("Site scrapper started for domain: {}", config.domain)
   }
 

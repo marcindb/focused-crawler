@@ -17,6 +17,10 @@ object Scheduler {
 
   case class Register(indexer: ActorRef)
 
+  case object GetStatus
+
+  case class Status(activeDomain: Int, closedDomains: Int)
+
   private case object SetMetrics
 
   def props(linkScrapperProps: Props) = Props(new Scheduler(linkScrapperProps))
@@ -59,11 +63,17 @@ class Scheduler(linkScrapperProps: Props) extends Actor with ActorLogging {
     metricsTick.cancel()
   }
 
-  override def receive: Receive = {
+  override def receive: Receive = register orElse status
 
+  private def register: Receive = {
     case Register(indexer: ActorRef) =>
       context.watch(indexer)
-      context.become(scheduling(indexer))
+      context.become(scheduling(indexer) orElse status)
+  }
+
+  private def status: Receive = {
+    case GetStatus =>
+      sender ! Status(active.size, closed.size)
   }
 
   private def scheduling(indexer: ActorRef): Receive = {
