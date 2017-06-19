@@ -65,7 +65,7 @@ private class LinkScrapper(scrapper: Scrapper) extends Actor with ActorLogging {
       val tryLinks = scrapper.links(url)
       tryLinks.fold(
         ex => {
-          log.warning("Exception occurred during scrapping {}, reason {}", gl, ex.getMessage)
+          log.debug("Exception occurred during scrapping {}, reason {}", gl, ex.getMessage)
           sender ! GetLinksError(gl, ex)
         },
         links => {

@@ -23,5 +23,5 @@ project/plugins/project/
 # mac
 .DS_Store
 
-engine/native/
+native
 *.dot

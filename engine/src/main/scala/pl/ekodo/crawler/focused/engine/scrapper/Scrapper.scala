@@ -20,7 +20,7 @@ trait Scrapper {
     * Returns links from given url
     *
     * @param url  requested url
-    * @return     [[scala.util.Success]] with links in case of success, otherwise [[scala.util.Failure]]
+    * @return     Success with links in case of success, otherwise Failure
     */
   def links(url: URL): Try[Set[Link]]
 

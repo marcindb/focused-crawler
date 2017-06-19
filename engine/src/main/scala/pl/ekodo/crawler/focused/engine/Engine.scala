@@ -70,11 +70,8 @@ private object ConfigParser {
   val parser = new scopt.OptionParser[RuntimeConfig]("Focused Crawler") {
     head("Focused Crawler", "0.0.1-SNAPSHOT")
 
-    opt[String]("output-dir").action((x, c) =>
-      c.copy(outputDir = x)).text("Output dir with generated graphs")
-
     opt[Int]('d', "depth").required()
-      .action((d, c) => c.copy(depth = d)).text("Depth of search")
+      .action((d, c) => c.copy(depth = d)).text("Depth of search (required)")
       .validate(d =>
         if (d > 0) success
         else failure("Must be positive")
@@ -82,18 +79,21 @@ private object ConfigParser {
 
     opt[Seq[URI]]('s', "seeds").required()
       .valueName("<http://seed1>,<https://seed2>...")
-      .action((seeds, c) => c.copy(seeds = seeds)).text("Link seeds")
+      .action((seeds, c) => c.copy(seeds = seeds)).text("URL seeds (required)")
       .validate(seeds =>
         if (seeds.forall(s => s.getScheme == "http" || s.getScheme == "https")) success
         else failure("Each seed link must starts with http:// or https://")
       )
 
     opt[Int]('l', "max-links").required()
-      .action((l, c) => c.copy(maxLinksNumber = l)).text("Maximum number of links")
+      .action((l, c) => c.copy(maxLinksNumber = l)).text("Maximum number of links (required)")
       .validate(l =>
         if (l > 0 && l < 10000) success
         else failure("Must be positive and less than 10000")
       )
+
+    opt[String]("output-dir").action((x, c) =>
+      c.copy(outputDir = x)).text("Output dir with generated graphs")
 
     opt[String]("tld").action((x, c) =>
       c.copy(topLevelDomainPolicy = x)).text("Search links from given top level domain")
