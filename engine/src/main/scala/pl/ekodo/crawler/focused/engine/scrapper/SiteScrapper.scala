@@ -14,24 +14,64 @@ case class SiteScrapperConfig(
   maxLinksVisited: Int
 )
 
+/**
+  * Companion object for [[SiteScrapper]] actor
+  */
 object SiteScrapper {
 
+  /**
+    * Input message, requests processing of given url
+    *
+    * @param url   url which has to be processed
+    * @param seed  seed url
+    * @param depth depth related to the seed url
+    */
   case class Process(url: URL, seed: URL, depth: Int)
 
+  /**
+    * Message sent to parent actor in case of finished job
+    */
   sealed trait Done
 
+  /**
+    * Sent in case of max number of requests for given domain exceeded.
+    * Simple prevents crawler traps.
+    */
   case object MaxRequestsExceeded extends Done
 
+  /**
+    * Sent in case of mac errors exceeded (for instance http 404)
+    */
   case object MaxErrorsExceeded extends Done
 
+  /**
+    * Sent if the queue of jobs is empty for specified time.
+    */
   case object NoMoreWork extends Done
 
+  /**
+    * Returns props of [[SiteScrapper]] actor
+    *
+    * @param config   scrapper config
+    * @param indexer  indexer
+    * @param scrapper scrapper
+    * @return         props of [[SiteScrapper]]
+    */
   def props(config: SiteScrapperConfig, indexer: ActorRef, scrapper: ActorRef) =
     Props(new SiteScrapper(config, indexer, scrapper))
 
 }
 
-class SiteScrapper(config: SiteScrapperConfig, indexer: ActorRef, scrapper: ActorRef)
+/**
+  * This actor is responsible for requesting given domain. It queues messages and send requests one by one
+  * in order to avoid overloading of the site. If the queue is empty for given time it assumes that the site
+  * is crawled and there is no more sites to visit for given domain.
+  *
+  * @param config   scrapper config
+  * @param indexer  indexer
+  * @param scrapper scrapper
+  */
+private class SiteScrapper(config: SiteScrapperConfig, indexer: ActorRef, scrapper: ActorRef)
   extends Actor with Stash with ActorLogging {
 
   private implicit val ec: ExecutionContext = context.system.dispatcher

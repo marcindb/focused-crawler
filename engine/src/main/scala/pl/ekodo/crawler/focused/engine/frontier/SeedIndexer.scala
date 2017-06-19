@@ -14,26 +14,56 @@ import scalax.collection.GraphPredef._
 import scalax.collection.io.dot._
 import scalax.collection.io.dot.{DotEdgeStmt, DotGraph, DotRootGraph, Id, NodeId}
 
-
+/**
+  * Companion object for [[SeedIndexer]] actor.
+  */
 object SeedIndexer {
 
+  /**
+    * Connection between urls
+    * @param from source url
+    * @param to   target url
+    */
   case class Connection(from: URL, to: URL)
 
+  /**
+    * Input message, requests indexing of connections
+    *
+    * @param connections set of connections
+    */
   case class IndexConnections(connections: Set[Connection])
 
+  /**
+    * Input message, requests graph generation
+    *
+    * @param output  output dir
+    */
   case class GenerateGraph(output: String)
 
+  /**
+    * Output message, returned in case of successful graph generation
+    *
+    * @param file  file with graph description in dot format
+    */
   case class GenerateGraphOK(file: Path)
 
-  case class GenerateGraphError(exp: Throwable)
-
+  /**
+    * Returns props for [[SeedIndexer]] actor
+    * @param seed  seed url
+    * @return      props of [[SeedIndexer]] actor
+    */
   def props(seed: URL) = Props(new SeedIndexer(seed))
 
 }
 
-class SeedIndexer(seed: URL) extends Actor with ActorLogging {
+/**
+  * This actor is responsible for indexing connections of given seed url.
+  *
+  * @param seed  seed url
+  */
+private class SeedIndexer(seed: URL) extends Actor with ActorLogging {
 
-  var links = Set.empty[Connection]
+  private var links = Set.empty[Connection]
 
   override def receive: Receive = {
     case IndexConnections(conns) =>
@@ -47,7 +77,7 @@ class SeedIndexer(seed: URL) extends Actor with ActorLogging {
   }
 
 
-  def graph(connections: Set[Connection]): String = {
+  private def graph(connections: Set[Connection]): String = {
     val graphConnections = connections.map(c => c.from.toString ~> c.to.toString).toSeq
     val g = Graph[String, DiEdge](graphConnections: _*)
     val root = DotRootGraph(directed = true, id = Some(Id(seed.toString)))

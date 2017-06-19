@@ -9,25 +9,74 @@ import kamon.Kamon
 import pl.ekodo.crawler.focused.engine.frontier.Indexer._
 import pl.ekodo.crawler.focused.engine.scrapper.Link
 
+/**
+  * Companion object for [[Indexer]] actor.
+  */
 object Indexer {
 
+  /**
+    * Defines policy for crawler which decides whether given link has to visited.
+    */
   type Policy = Link => Boolean
 
+  /**
+    * Input message, requests links indexing
+    *
+    * @param src   source of links
+    * @param seed  seed url
+    * @param depth depth of links related to seed
+    * @param links set of links
+    */
   case class Index(src: URL, seed: URL, depth: Int, links: Set[Link])
 
+  /**
+    * Input message, requests status of indexer
+    */
   case object GetStatus
 
+  /**
+    * Returns status of indexer
+    *
+    * @param indexed number of indexed urls
+    */
   case class Status(indexed: Int)
 
+  /**
+    * Input message, requests finish of indexing
+    */
   case object Finish
 
+  /**
+    * Sent in response to [[Finish]] message
+    *
+    * @param graphs set of paths with generated graphs
+    */
   case class FinishOK(graphs: Set[Path])
 
+  /**
+    * Returns props of [[Indexer]] actor
+    *
+    * @param outputDir  output dir
+    * @param depth      max depth of links search
+    * @param seeds      seeds
+    * @param scheduler  scheduler
+    * @param policy     crawler policy
+    * @return           props of [[Indexer]]
+    */
   def props(outputDir: String, depth: Int, seeds: Set[URL], scheduler: ActorRef, policy: Policy) =
     Props(new Indexer(outputDir, depth, seeds, scheduler, policy))
 
 }
 
+/**
+  * This actor is responsible for indexing links and deciding which links have to be visited.
+  *
+  * @param outputDir output dir
+  * @param maxDepth  max depth of links search
+  * @param seeds     seeds
+  * @param scheduler scheduler
+  * @param policy    crawler policy
+  */
 class Indexer(outputDir: String, maxDepth: Int, seeds: Set[URL], scheduler: ActorRef, policy: Policy)
   extends Actor with ActorLogging {
 

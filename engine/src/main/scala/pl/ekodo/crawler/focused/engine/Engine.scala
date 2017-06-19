@@ -11,6 +11,9 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
+/**
+  * Main class of focused crawler
+  */
 object Engine extends App {
 
   ConfigParser.parser.parse(args, RuntimeConfig()) match {
@@ -41,6 +44,17 @@ object Engine extends App {
 
 }
 
+/**
+  * Runtime config, these parameters can be overridden during app start
+  *
+  * @param outputDir            output dir of graphs
+  * @param seeds                seed URLs (for instance http://bbc.com)
+  * @param depth                maximum depth of crawler search
+  * @param maxLinksNumber       maximum required number of links
+  * @param topLevelDomainPolicy defines top level domain policy for searching
+  * @param containsPolicy       defines text pattern which must be contained in anchor html
+  * @param regexpPolicy         defines regexp pattern which must be satisfied by anchor html
+  */
 case class RuntimeConfig(
   outputDir: String = sys.props("user.dir"),
   seeds: Seq[URI] = Seq(),
@@ -51,7 +65,7 @@ case class RuntimeConfig(
   regexpPolicy: String = ""
 )
 
-object ConfigParser {
+private object ConfigParser {
 
   val parser = new scopt.OptionParser[RuntimeConfig]("Focused Crawler") {
     head("Focused Crawler", "0.0.1-SNAPSHOT")

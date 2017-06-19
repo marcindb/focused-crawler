@@ -10,20 +10,49 @@ import pl.ekodo.crawler.focused.engine.scrapper.{SiteScrapper, SiteScrapperConfi
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-
+/**
+  * Companion object for [[Scheduler]] actor
+  */
 object Scheduler {
 
+  /**
+    * Input message, requests searching of links in given urls
+    *
+    * @param seed   seed
+    * @param depth  depth of urls related to seed
+    * @param urls   urls to fetch
+    */
   case class Schedule(seed: URL, depth: Int, urls: Set[URL])
 
+  /**
+    * Input message, registers indexer
+    *
+    * @param indexer indexer
+    */
   case class Register(indexer: ActorRef)
 
+  /**
+    * Input message, requests status of scheduler
+    */
   case object GetStatus
 
+  /**
+    * Output message for [[GetStatus]] message, returns status info
+    *
+    * @param activeDomain  number of active domains (actively scrapped)
+    * @param closedDomains number of closed domains (no more scrapped)
+    */
   case class Status(activeDomain: Int, closedDomains: Int)
 
-  private case object SetMetrics
-
+  /**
+    * Returns props of [[Scheduler]] actor
+    *
+    * @param linkScrapperProps link scrapper props
+    * @return                  props of [[Scheduler]] actor
+    */
   def props(linkScrapperProps: Props) = Props(new Scheduler(linkScrapperProps))
+
+  private case object SetMetrics
 
   private type Domain = String
 
@@ -43,7 +72,12 @@ object Scheduler {
 
 }
 
-class Scheduler(linkScrapperProps: Props) extends Actor with ActorLogging {
+/**
+  * Schedules sites scrapping.
+  *
+  * @param linkScrapperProps props of [[pl.ekodo.crawler.focused.engine.scrapper.LinkScrapper]] actor
+  */
+private class Scheduler(linkScrapperProps: Props) extends Actor with ActorLogging {
 
   private implicit val ec: ExecutionContext = context.dispatcher
 

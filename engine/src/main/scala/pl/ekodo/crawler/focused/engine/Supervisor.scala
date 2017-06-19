@@ -12,23 +12,47 @@ import pl.ekodo.crawler.focused.engine.scrapper.LinkScrapper
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
+/**
+  * Companion object for [[Supervisor]] actor.
+  */
 object Supervisor {
+
+  /**
+    * Input message. Requests application status.
+    */
+  case object GetAppStatus
+
+  /**
+    * Output type message for [[GetAppStatus]].
+    */
+  sealed trait AppStatus
+
+  /**
+    * Returned in case of finished crawler job.
+    */
+  case object Finished extends AppStatus
+
+  /**
+    * Returned in case of active crawler job.
+    */
+  case object Working extends AppStatus
+
+  /**
+    * Internal message, requests check the crawler status.
+    */
+  private case object CheckStatus
 
   def props(config: RuntimeConfig) = Props(new Supervisor(config))
 
-  case object GetAppStatus
-
-  sealed trait AppStatus
-
-  case object Finished extends AppStatus
-
-  case object Working extends AppStatus
-
-  private case object CheckStatus
-
 }
 
-class Supervisor(config: RuntimeConfig) extends Actor with ActorLogging {
+/**
+  * Supervisor the entry point actor for the crawler.
+  * It creates all actors required for starting crawling.
+  *
+  * @param config runtime config
+  */
+private class Supervisor(config: RuntimeConfig) extends Actor with ActorLogging {
 
   override val supervisorStrategy =
     OneForOneStrategy() {
@@ -103,6 +127,6 @@ class Supervisor(config: RuntimeConfig) extends Actor with ActorLogging {
       sender ! Finished
   }
 
-
   override def postStop(): Unit = tick.cancel()
+
 }

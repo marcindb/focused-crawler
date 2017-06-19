@@ -11,12 +11,24 @@ import scala.util.Try
 
 case class Link(url: URL, html: String)
 
+/**
+  * This class is responsible for fetching and extracting links from given url
+  */
 trait Scrapper {
 
+  /**
+    * Returns links from given url
+    *
+    * @param url  requested url
+    * @return     [[scala.util.Success]] with links in case of success, otherwise [[scala.util.Failure]]
+    */
   def links(url: URL): Try[Set[Link]]
 
 }
 
+/**
+  * Implements [[Scrapper]] based on scalascraper lib.
+  */
 object JsoupScrapper extends Scrapper {
 
   private val Anchor = "a"
