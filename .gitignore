@@ -24,3 +24,4 @@ project/plugins/project/
 .DS_Store
 
 engine/native/
+*.dot

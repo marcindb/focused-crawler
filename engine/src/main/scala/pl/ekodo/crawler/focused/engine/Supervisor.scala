@@ -57,15 +57,15 @@ class Supervisor(config: RuntimeConfig) extends Actor with ActorLogging {
   }
 
   private val indexer = context.actorOf(
-    Indexer.props(config.depth, config.seeds.map(_.toURL).toSet, scheduler, policy), "indexer")
+    Indexer.props(config.outputDir, config.depth, config.seeds.map(_.toURL).toSet, scheduler, policy), "indexer")
 
   private implicit val ec: ExecutionContext = context.system.dispatcher
 
   private val tick = context.system.scheduler.schedule(1.second, 1.second, self, CheckStatus)
 
-  override def receive: Receive = monitor(Working)
+  override def receive: Receive = monitor
 
-  private def monitor(status: AppStatus): Receive = {
+  private def monitor: Receive = {
 
     case CheckStatus =>
       scheduler ! Scheduler.GetStatus
@@ -74,19 +74,35 @@ class Supervisor(config: RuntimeConfig) extends Actor with ActorLogging {
     case Scheduler.Status(active, closed) =>
       if (active == 0) {
         log.info("All domains closed, ready to shutdown")
-        context.become(monitor(Finished))
+        indexer ! Indexer.Finish
+        context.become(finishing)
       }
 
     case Indexer.Status(indexed) =>
       if (indexed > config.maxLinksNumber) {
         log.info("Max number of links exceeded, ready to shutdown")
-        context.become(monitor(Finished))
+        indexer ! Indexer.Finish
+        context.become(finishing)
       }
 
     case GetAppStatus =>
-      sender ! status
-
+      sender ! Working
   }
+
+  private def finishing: Receive = {
+    case Indexer.FinishOK(graphs) =>
+      context.become(finished)
+
+    case GetAppStatus =>
+      sender ! Working
+  }
+
+
+  private def finished: Receive = {
+    case GetAppStatus =>
+      sender ! Finished
+  }
+
 
   override def postStop(): Unit = tick.cancel()
 }

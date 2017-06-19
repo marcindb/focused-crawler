@@ -6,6 +6,8 @@ object Dependencies {
 
   private val kamonVersion = "0.6.7"
 
+  private val graphVersion = "1.11.5"
+
   val akka = {
     Seq(
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
@@ -36,6 +38,13 @@ object Dependencies {
       // loader which loads Sigar JAR to get system metrics
       "io.kamon" % "sigar-loader" % "1.6.6-rev002",
       "org.aspectj" % "aspectjweaver" % "1.8.10"
+    )
+  }
+
+  val graph = {
+    Seq(
+      "org.scala-graph" %% "graph-core" % graphVersion,
+      "org.scala-graph" %% "graph-dot" % graphVersion
     )
   }
 

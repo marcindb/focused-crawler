@@ -16,7 +16,7 @@ class IndexerSpec extends AkkaTest(ActorSystem("indexer-spec")) {
 
     val scheduler = TestProbe()
 
-    val indexer = system.actorOf(Indexer.props(3, Set(url1, url2, url3), scheduler.ref, AlwaysPass))
+    val indexer = system.actorOf(Indexer.props("", 3, Set(url1, url2, url3), scheduler.ref, AlwaysPass))
 
     scheduler.expectMsg(
       Scheduler.Register(indexer)
@@ -36,7 +36,7 @@ class IndexerSpec extends AkkaTest(ActorSystem("indexer-spec")) {
 
     val scheduler = TestProbe()
 
-    val indexer = TestActorRef(Indexer.props(3, Set(url1, url2, url3), scheduler.ref, AlwaysPass))
+    val indexer = TestActorRef(Indexer.props("", 3, Set(url1, url2, url3), scheduler.ref, AlwaysPass))
 
     indexer.children.size shouldEqual 3
   }
@@ -46,7 +46,7 @@ class IndexerSpec extends AkkaTest(ActorSystem("indexer-spec")) {
 
     val scheduler = TestProbe()
 
-    val indexer = system.actorOf(Indexer.props(3, Set(url), scheduler.ref, AlwaysPass))
+    val indexer = system.actorOf(Indexer.props("", 3, Set(url), scheduler.ref, AlwaysPass))
 
     scheduler.expectMsgAllOf(
       Scheduler.Register(indexer),
@@ -69,7 +69,7 @@ class IndexerSpec extends AkkaTest(ActorSystem("indexer-spec")) {
     val regexpPolicy = new HtmlRegexp(date)
     val policy = Policy(tldPolicy, regexpPolicy)
 
-    val indexer = system.actorOf(Indexer.props(3, Set(seed), scheduler.ref, policy))
+    val indexer = system.actorOf(Indexer.props("", 3, Set(seed), scheduler.ref, policy))
 
     scheduler.expectMsgAllOf(
       Scheduler.Register(indexer),
@@ -91,7 +91,7 @@ class IndexerSpec extends AkkaTest(ActorSystem("indexer-spec")) {
 
     val scheduler = TestProbe()
 
-    val indexer = system.actorOf(Indexer.props(3, Set(url), scheduler.ref, AlwaysPass))
+    val indexer = system.actorOf(Indexer.props("", 3, Set(url), scheduler.ref, AlwaysPass))
 
     scheduler.expectMsgAllOf(
       Scheduler.Register(indexer),
@@ -111,7 +111,7 @@ class IndexerSpec extends AkkaTest(ActorSystem("indexer-spec")) {
 
     val scheduler = TestProbe()
 
-    val indexer = system.actorOf(Indexer.props(3, Set(url), scheduler.ref, AlwaysPass))
+    val indexer = system.actorOf(Indexer.props("", 3, Set(url), scheduler.ref, AlwaysPass))
 
     scheduler.expectMsgAllOf(
       Scheduler.Register(indexer),

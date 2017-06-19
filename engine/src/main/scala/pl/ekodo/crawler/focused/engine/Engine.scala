@@ -42,6 +42,7 @@ object Engine extends App {
 }
 
 case class RuntimeConfig(
+  outputDir: String = sys.props("user.dir"),
   seeds: Seq[URI] = Seq(),
   depth: Int = 5,
   maxLinksNumber: Int = 10000,
@@ -54,6 +55,9 @@ object ConfigParser {
 
   val parser = new scopt.OptionParser[RuntimeConfig]("Focused Crawler") {
     head("Focused Crawler", "0.0.1-SNAPSHOT")
+
+    opt[String]("output-dir").action((x, c) =>
+      c.copy(outputDir = x)).text("Output dir with generated graphs")
 
     opt[Int]('d', "depth").required()
       .action((d, c) => c.copy(depth = d)).text("Depth of search")

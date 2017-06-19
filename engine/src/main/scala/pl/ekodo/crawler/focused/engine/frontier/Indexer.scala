@@ -1,35 +1,50 @@
 package pl.ekodo.crawler.focused.engine.frontier
 
-import java.net.URL
+import java.net.{MalformedURLException, URL}
+import java.nio.file.Path
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.SupervisorStrategy.{Escalate, Resume}
+import akka.actor.{Actor, ActorLogging, ActorRef, OneForOneStrategy, Props, Terminated}
 import kamon.Kamon
-import pl.ekodo.crawler.focused.engine.frontier.Indexer.{GetStatus, Index, Policy, Status}
+import pl.ekodo.crawler.focused.engine.frontier.Indexer._
 import pl.ekodo.crawler.focused.engine.scrapper.Link
 
 object Indexer {
 
   type Policy = Link => Boolean
 
+  case class Index(src: URL, seed: URL, depth: Int, links: Set[Link])
+
   case object GetStatus
 
   case class Status(indexed: Int)
 
-  case class Index(src: URL, seed: URL, depth: Int, links: Set[Link])
+  case object Finish
 
-  def props(depth: Int, seeds: Set[URL], scheduler: ActorRef, policy: Policy) =
-    Props(new Indexer(depth, seeds, scheduler, policy))
+  case class FinishOK(graphs: Set[Path])
+
+  def props(outputDir: String, depth: Int, seeds: Set[URL], scheduler: ActorRef, policy: Policy) =
+    Props(new Indexer(outputDir, depth, seeds, scheduler, policy))
 
 }
 
-class Indexer(maxDepth: Int, seeds: Set[URL], scheduler: ActorRef, policy: Policy) extends Actor with ActorLogging {
+class Indexer(outputDir: String, maxDepth: Int, seeds: Set[URL], scheduler: ActorRef, policy: Policy)
+  extends Actor with ActorLogging {
+
+  override val supervisorStrategy =
+    OneForOneStrategy() {
+      case _: MalformedURLException => Resume
+      case _: Exception => Escalate
+    }
 
   private val indexSizeMetric = Kamon.metrics.counter("index-size")
 
   private var indexed = seeds
 
   private val seedIndexers = seeds.map { seed =>
-    (seed, context.actorOf(SeedIndexer.props(seed)))
+    val seedIndexer = context.actorOf(SeedIndexer.props(seed))
+    context.watch(seedIndexer)
+    (seed, seedIndexer)
   }.toMap
 
   override def preStart(): Unit = {
@@ -52,12 +67,35 @@ class Indexer(maxDepth: Int, seeds: Set[URL], scheduler: ActorRef, policy: Polic
 
     case GetStatus =>
       sender ! Status(indexed.size)
+
+    case Finish =>
+      seedIndexers.values.foreach { seedIndexer =>
+        seedIndexer ! SeedIndexer.GenerateGraph(outputDir)
+      }
+      context.become(finishing(sender, seedIndexers.values.toSet, Set.empty))
+
+  }
+
+  private def finishing(respondTo: ActorRef, waitForResponse: Set[ActorRef], graphs: Set[Path]): Receive =  {
+    case SeedIndexer.GenerateGraphOK(graph) =>
+      val waitFor = waitForResponse - sender
+      if (waitFor.nonEmpty)
+        context.become(finishing(respondTo, waitFor, graphs + graph))
+      else
+        respondTo ! FinishOK(graphs)
+    case Terminated(ref) =>
+      val waitFor = waitForResponse - ref
+      if(waitFor.nonEmpty)
+        context.become(finishing(respondTo, waitFor, graphs))
+      else
+        respondTo ! FinishOK(graphs)
   }
 
   private def toVisit(index: Index): Set[Link] =
-    if (index.depth > maxDepth)
+    if (index.depth >= maxDepth)
       Set.empty
     else
       index.links.filter(l => !indexed.contains(l.url) && policy(l))
+
 
 }

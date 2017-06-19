@@ -16,4 +16,5 @@ lazy val engine = project.in(file("engine")).
       ++ Dependencies.scrapper
       ++ Dependencies.scopt
       ++ Dependencies.kamon
+      ++ Dependencies.graph
   ).enablePlugins(JavaAppPackaging)
