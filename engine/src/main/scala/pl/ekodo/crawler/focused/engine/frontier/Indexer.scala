@@ -4,10 +4,12 @@ import java.net.URL
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import kamon.Kamon
-import pl.ekodo.crawler.focused.engine.frontier.Indexer.{GetStatus, Index, Status}
+import pl.ekodo.crawler.focused.engine.frontier.Indexer.{GetStatus, Index, Policy, Status}
 import pl.ekodo.crawler.focused.engine.scrapper.Link
 
 object Indexer {
+
+  type Policy = Link => Boolean
 
   case object GetStatus
 
@@ -15,11 +17,12 @@ object Indexer {
 
   case class Index(src: URL, seed: URL, depth: Int, links: Set[Link])
 
-  def props(depth: Int, seeds: Set[URL], scheduler: ActorRef) = Props(new Indexer(depth, seeds, scheduler))
+  def props(depth: Int, seeds: Set[URL], scheduler: ActorRef, policy: Policy) =
+    Props(new Indexer(depth, seeds, scheduler, policy))
 
 }
 
-class Indexer(depth: Int, seeds: Set[URL], scheduler: ActorRef) extends Actor with ActorLogging {
+class Indexer(maxDepth: Int, seeds: Set[URL], scheduler: ActorRef, policy: Policy) extends Actor with ActorLogging {
 
   private val indexSizeMetric = Kamon.metrics.counter("index-size")
 
@@ -52,9 +55,9 @@ class Indexer(depth: Int, seeds: Set[URL], scheduler: ActorRef) extends Actor wi
   }
 
   private def toVisit(index: Index): Set[Link] =
-    if (index.depth >= depth)
+    if (index.depth > maxDepth)
       Set.empty
     else
-      index.links.filterNot(l => indexed.contains(l.url))
+      index.links.filter(l => !indexed.contains(l.url) && policy(l))
 
 }

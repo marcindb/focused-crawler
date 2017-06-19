@@ -6,7 +6,7 @@ import akka.actor.SupervisorStrategy.{Escalate, Resume}
 import akka.actor.{Actor, ActorLogging, OneForOneStrategy, Props}
 import akka.routing.FromConfig
 import pl.ekodo.crawler.focused.engine.Supervisor._
-import pl.ekodo.crawler.focused.engine.frontier.{Indexer, Scheduler}
+import pl.ekodo.crawler.focused.engine.frontier._
 import pl.ekodo.crawler.focused.engine.scrapper.LinkScrapper
 
 import scala.concurrent.ExecutionContext
@@ -40,8 +40,24 @@ class Supervisor(config: RuntimeConfig) extends Actor with ActorLogging {
 
   private val scheduler = context.actorOf(Scheduler.props(linkScrapperProps), "scheduler")
 
+  private val policy = {
+    val tldPolicy = {
+      if (config.topLevelDomainPolicy.nonEmpty) Some(new TopLevelDomain(config.topLevelDomainPolicy)) else None
+    }
+    val containsPolicy =
+    {
+      if (config.containsPolicy.nonEmpty) Some(new HtmlContains(config.containsPolicy)) else None
+    }
+    val regexpPolicy =
+    {
+      if (config.regexpPolicy.nonEmpty) Some(new HtmlRegexp(config.regexpPolicy.r)) else None
+    }
+    val policies = Seq(tldPolicy, containsPolicy, regexpPolicy).flatten
+    Policy(policies: _*)
+  }
+
   private val indexer = context.actorOf(
-    Indexer.props(config.depth, config.seeds.map(_.toURL).toSet, scheduler), "indexer")
+    Indexer.props(config.depth, config.seeds.map(_.toURL).toSet, scheduler, policy), "indexer")
 
   private implicit val ec: ExecutionContext = context.system.dispatcher
 

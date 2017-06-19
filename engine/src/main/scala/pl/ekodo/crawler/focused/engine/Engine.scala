@@ -9,7 +9,7 @@ import kamon.Kamon
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 object Engine extends App {
 
@@ -32,7 +32,7 @@ object Engine extends App {
           case Success(r) if r == Supervisor.Working =>
             system.log.debug("Crawler still working")
           case Failure(ex) =>
-            system.log.error("Could not get app status")
+            system.log.warning("Could not get app status")
         }
       }
     case None =>
@@ -41,7 +41,14 @@ object Engine extends App {
 
 }
 
-case class RuntimeConfig(seeds: Seq[URI] = Seq(), depth: Int = 5, maxLinksNumber: Int = 10000)
+case class RuntimeConfig(
+  seeds: Seq[URI] = Seq(),
+  depth: Int = 5,
+  maxLinksNumber: Int = 10000,
+  topLevelDomainPolicy: String = "",
+  containsPolicy: String = "",
+  regexpPolicy: String = ""
+)
 
 object ConfigParser {
 
@@ -69,6 +76,22 @@ object ConfigParser {
         if (l > 0 && l < 10000) success
         else failure("Must be positive and less than 10000")
       )
+
+    opt[String]("tld").action((x, c) =>
+      c.copy(topLevelDomainPolicy = x)).text("Search links from given top level domain")
+
+    opt[String]("contains").action((x, c) =>
+      c.copy(containsPolicy = x)).text("Search links with given text")
+
+    opt[String]("regexp").action((x, c) =>
+      c.copy(regexpPolicy = x)).text("Search links which match regexp")
+      .validate { regexp =>
+        val r = Try(regexp.r)
+        r.fold(
+          exp => failure(exp.getMessage),
+          r => success
+        )
+      }
 
   }
 }

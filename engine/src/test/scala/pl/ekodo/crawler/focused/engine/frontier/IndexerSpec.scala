@@ -16,7 +16,7 @@ class IndexerSpec extends AkkaTest(ActorSystem("indexer-spec")) {
 
     val scheduler = TestProbe()
 
-    val indexer = system.actorOf(Indexer.props(3, Set(url1, url2, url3), scheduler.ref))
+    val indexer = system.actorOf(Indexer.props(3, Set(url1, url2, url3), scheduler.ref, AlwaysPass))
 
     scheduler.expectMsg(
       Scheduler.Register(indexer)
@@ -36,7 +36,7 @@ class IndexerSpec extends AkkaTest(ActorSystem("indexer-spec")) {
 
     val scheduler = TestProbe()
 
-    val indexer = TestActorRef(Indexer.props(3, Set(url1, url2, url3), scheduler.ref))
+    val indexer = TestActorRef(Indexer.props(3, Set(url1, url2, url3), scheduler.ref, AlwaysPass))
 
     indexer.children.size shouldEqual 3
   }
@@ -46,7 +46,7 @@ class IndexerSpec extends AkkaTest(ActorSystem("indexer-spec")) {
 
     val scheduler = TestProbe()
 
-    val indexer = system.actorOf(Indexer.props(3, Set(url), scheduler.ref))
+    val indexer = system.actorOf(Indexer.props(3, Set(url), scheduler.ref, AlwaysPass))
 
     scheduler.expectMsgAllOf(
       Scheduler.Register(indexer),
@@ -58,12 +58,40 @@ class IndexerSpec extends AkkaTest(ActorSystem("indexer-spec")) {
     scheduler.expectNoMsg()
   }
 
+  it should "not send link which does not pass policy" in {
+    val seed = new URL("http://bbc.com")
+
+    val scheduler = TestProbe()
+
+    val tld = "com"
+    val tldPolicy = new TopLevelDomain(tld)
+    val date = """\d\d\d\d-\d\d-\d\d""".r
+    val regexpPolicy = new HtmlRegexp(date)
+    val policy = Policy(tldPolicy, regexpPolicy)
+
+    val indexer = system.actorOf(Indexer.props(3, Set(seed), scheduler.ref, policy))
+
+    scheduler.expectMsgAllOf(
+      Scheduler.Register(indexer),
+      Scheduler.Schedule(seed, 0, Set(seed))
+    )
+
+    val validLink = Link(new URL("http://bbc.com/poland"), "<a href='http://bbc.com/poland'>Poland News 2017-06-19</a>")
+    val invalidLink = Link(new URL("http://bbc.co.uk"), "<a href='http://bbc.com/poland'>Poland News 2017-06-19</a>")
+
+    indexer ! Indexer.Index(seed, seed, 0, Set(validLink, invalidLink))
+
+    scheduler.expectMsg(
+      Scheduler.Schedule(seed, 1, Set(validLink.url))
+    )
+  }
+
   it should "send new urls to scheduler with increased depth" in {
     val url = new URL("http://google.com")
 
     val scheduler = TestProbe()
 
-    val indexer = system.actorOf(Indexer.props(3, Set(url), scheduler.ref))
+    val indexer = system.actorOf(Indexer.props(3, Set(url), scheduler.ref, AlwaysPass))
 
     scheduler.expectMsgAllOf(
       Scheduler.Register(indexer),
@@ -83,7 +111,7 @@ class IndexerSpec extends AkkaTest(ActorSystem("indexer-spec")) {
 
     val scheduler = TestProbe()
 
-    val indexer = system.actorOf(Indexer.props(3, Set(url), scheduler.ref))
+    val indexer = system.actorOf(Indexer.props(3, Set(url), scheduler.ref, AlwaysPass))
 
     scheduler.expectMsgAllOf(
       Scheduler.Register(indexer),

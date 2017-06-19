@@ -36,6 +36,7 @@ class LinkScrapper(scrapper: Scrapper) extends Actor with ActorLogging {
           sender ! GetLinksError(gl, ex)
         },
         links => {
+          log.debug("Scrapped links: {}", links.size)
           sender ! GetLinksOK(gl, links)
         }
       )
